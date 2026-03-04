@@ -54,8 +54,8 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     nbr_samples_for_pitch = int(np.floor(45e-3 * fs))
     
     # Speed-up settings
-    waiting_period = 9e-3  # seconds
-    block_update_threshold = int(np.floor(fs * waiting_period))
+    waiting_period = 9e-3  # The waiting period during which a pitch block can be excluded from updating (s).
+    block_update_threshold = int(np.floor(fs * waiting_period)) # As above, expressed in nbr of samples.
     zero_update_threshold = int(np.floor(block_update_threshold / 10))
     speed_up_horizon = block_update_threshold
     
@@ -72,11 +72,13 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # Print progress
     do_print = True
+    if do_print:
+        print("This is pearls_copy.py")
     
     # ========== INITIALIZATION ==========
     
     N = len(d)
-    fpgrid = np.arange(fmin, fmax + fdist, fdist)
+    fpgrid = np.arange(fmin, fmax + 1, fdist)
     P = len(fpgrid)
     nbr_of_variables = P * Lmax
     
@@ -88,7 +90,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     t_temp = np.arange(dictionary_length)
     
     # Dictionary initialization
-    A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel()) / fs
+    A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel(order='F')) / fs
     A_inner_no_phase = A_inner.copy()
     A = np.exp(1j * A_inner)
     A_old = A.copy()
@@ -115,7 +117,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     # Active/inactive blocks
     active_blocks = np.arange(P)
     inactive_blocks = np.array([], dtype=int)
-    nbr_active_blocks = np.zeros(N, dtype=int)
     
     # Active indices
     active_indices = np.arange(P * Lmax)
@@ -124,34 +125,28 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     # ========== ALGORITHM ==========
     
     for n in range(N):
-        if do_print and (n + 1) % 100 == 0:
-            print(f'{n + 1} of {N}')
+        if do_print and n % 100 == 0:
+            print(f'{n} of {N}')
             
-        nbr_active_blocks[n] = len(active_blocks)
         
         # Save current grid
         fpgrid_hist[:, n] = fpgrid
         
         # ========== NEW SAMPLE ==========
-        samples_left = dictionary_length - (n % dictionary_length)
-        if samples_left == dictionary_length:
-            sample_index = dictionary_length - 1
-        else:
-            sample_index = n % dictionary_length
-            
+        sample_index = n % dictionary_length 
         xn = A[sample_index, :]
         
         # Update dictionary when cycle completes
-        if samples_left == dictionary_length:
+        if (n+1) % dictionary_length == 0:
             A_old = A.copy()
             upper_time_index = min(N, n + dictionary_length)
-            t_temp = t[(n + 1):upper_time_index]
-            
-            if upper_time_index - n < dictionary_length:
-                t_temp = np.concatenate([t_temp, 
-                                        np.zeros(dictionary_length - (upper_time_index - n))])
+
+            # If upper index wanted to exceed N we set the last part of t_temp to zero.
+
+            t_temp = np.zeros_like(t_temp)
+            t_temp[:upper_time_index - (n + 1)] = t[(n + 1):upper_time_index]
                 
-            A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel()) / fs
+            A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel(order='F')) / fs
             A_inner_no_phase = A_inner.copy()
             A = np.exp(1j * A_inner)
             
@@ -164,11 +159,11 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         # ========== UPDATE PENALTY PARAMETERS ==========
         if n >= Delta and (n % 401) == 0:
             inner_prod_indices = np.arange(n - Delta + 1, n + 1)
+            lambda_fact = lambda_val ** np.arange(Delta - 1, -1, -1)
             
             if Delta > sample_index + 1:
                 delta_diff = Delta - (sample_index + 1)
                 d_for_inner_prod = d[inner_prod_indices]
-                lambda_fact = lambda_val ** np.arange(Delta - 1, -1, -1)
                 
                 A_old_for_inner_prod = A_old[-(delta_diff):, :]
                 A_for_inner_prod = A[:(sample_index + 1), :]
@@ -179,7 +174,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                 ))
             else:
                 A_inner_prod_indices = np.arange(sample_index - Delta + 1, sample_index + 1)
-                lambda_fact = lambda_val ** np.arange(Delta - 1, -1, -1)
                 max_norm = np.max(np.abs(
                     A[A_inner_prod_indices, :].conj().T @ (d[inner_prod_indices] * lambda_fact)
                 ))
@@ -254,10 +248,10 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                 start_index_time = max(n - nbr_samples_for_pitch + 1, 1)
                 stop_index_time = current_index_time + update_horizon
                 
-                if stop_index_time > N:
-                    update_horizon = update_horizon - (stop_index_time - N)
+                if stop_index_time >= N:
+                    update_horizon = update_horizon - (stop_index_time - N) - 1
                     
-                stop_index_time = min(stop_index_time, N)
+                stop_index_time = min(stop_index_time, N-1)
                 pitch_limit = fdist / 2
                 
                 ref_signal = d[start_index_time:current_index_time + 1]
@@ -268,7 +262,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                 # Adjust if at end of dictionary cycle
                 index_diff = stop_index_curr_A - dictionary_length
                 if index_diff > 0:
-                    stop_index_curr_A = min(dictionary_length, stop_index_curr_A)
+                    stop_index_curr_A = min(dictionary_length - 1, stop_index_curr_A)
                     
                 if start_index_curr_A <= 0:
                     # Need to use old A
@@ -550,11 +544,12 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
         # Update dictionary
         A_inner_no_phase_temp = 2 * np.pi * np.outer(t_temp, np.arange(1, Lmax + 1)) * new_grid_point / fs
         A_inner_temp = phase_update(ref_signal, A_inner_no_phase_temp, 0, len(ref_signal) - 1,
-                                    0, Lmax, Lmax)
+                                    1, Lmax, Lmax)
         A_temp = np.exp(1j * A_inner_temp)
         
         # Update matrices
         temp_index_update = index_for_current_A + len(change_indices_curr_A)
+
         A_inner_no_phase_new[change_indices_curr_A[0]:change_indices_curr_A[-1] + 1, 
                             harmonic_indices[0]:harmonic_indices[-1] + 1] = \
             A_inner_no_phase_temp[index_for_current_A:temp_index_update, :]
