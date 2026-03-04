@@ -394,15 +394,7 @@ def rls_update(w_old: np.ndarray, R: np.ndarray, r: np.ndarray,
     for k_pitch in range(P):
         temp_indices = np.arange(k_pitch * Lmax, (k_pitch + 1) * Lmax)
         
-        if k_pitch == 0:
-            other_indices = np.arange(Lmax, P * Lmax)
-        elif k_pitch == P - 1:
-            other_indices = np.arange((P - 1) * Lmax)
-        else:
-            other_indices = np.concatenate([
-                np.arange(k_pitch * Lmax),
-                np.arange((k_pitch + 1) * Lmax, P * Lmax)
-            ])
+        other_indices = np.setdiff1d(np.arange(P * Lmax), temp_indices)
             
         R_temp = R[temp_indices, :]
         R_q = R_temp[:, other_indices]
