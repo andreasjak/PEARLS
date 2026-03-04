@@ -6,7 +6,7 @@ import numpy as np
 import scipy.signal as signal
 from scipy.io import wavfile
 import matplotlib.pyplot as plt
-from Pearls.Python.pearls import pearls
+from pearls import pearls
 
 
 def main():

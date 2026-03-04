@@ -91,7 +91,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # Dictionary initialization
     A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel(order='F')) / fs
-    A_inner_no_phase = A_inner.copy()
     A = np.exp(1j * A_inner)
     A_old = A.copy()
     
@@ -147,7 +146,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             t_temp[:upper_time_index - (n + 1)] = t[(n + 1):upper_time_index]
                 
             A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel(order='F')) / fs
-            A_inner_no_phase = A_inner.copy()
             A = np.exp(1j * A_inner)
             
         dn = d[n]
@@ -269,17 +267,17 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                     start_index_old_A = dictionary_length + start_index_curr_A
                     start_index_curr_A = 0
                     
-                    A, A_inner, A_inner_no_phase, A_old, fpgrid, w_hat, change_flag = \
+                    A, A_inner, A_old, fpgrid, w_hat, change_flag = \
                         dictionary_update(
-                            w_rls, ref_signal, pitch_limit, A, A_inner, A_inner_no_phase,
+                            w_rls, ref_signal, pitch_limit, A, A_inner,
                             fpgrid, t, fs, Lmax, P, dictionary_length, start_index_time,
                             stop_index_time, curr_index_curr_A, start_index_curr_A,
                             stop_index_curr_A, A_old, start_index_old_A
                         )
                 else:
-                    A, A_inner, A_inner_no_phase, _, fpgrid, w_hat, change_flag = \
+                    A, A_inner, _, fpgrid, w_hat, change_flag = \
                         dictionary_update(
-                            w_rls, ref_signal, pitch_limit, A, A_inner, A_inner_no_phase,
+                            w_rls, ref_signal, pitch_limit, A, A_inner,
                             fpgrid, t, fs, Lmax, P, dictionary_length, start_index_time,
                             stop_index_time, curr_index_curr_A, start_index_curr_A,
                             stop_index_curr_A, None, None
@@ -422,7 +420,7 @@ def rls_update(w_old: np.ndarray, R: np.ndarray, r: np.ndarray,
 
 
 def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: float,
-                     A: np.ndarray, A_inner: np.ndarray, A_inner_no_phase: np.ndarray,
+                     A: np.ndarray, A_inner: np.ndarray,
                      fpgrid: np.ndarray, t: np.ndarray, fs: float, Lmax: int, P: int,
                      dictionary_length: int, start_index_time: int, stop_index_time: int,
                      curr_index_curr_A: int, start_index_curr_A: int, stop_index_curr_A: int,
@@ -482,7 +480,6 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     
     A_new = A
     A_inner_new = A_inner
-    A_inner_no_phase_new = A_inner_no_phase
     A_old_new = A_old
     fpgrid_new = fpgrid.copy()
     
@@ -508,7 +505,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     peak_indices, _ = find_peaks(w_norms)
     
     if len(peak_indices) == 0:
-        return A_new, A_inner_new, A_inner_no_phase_new, A_old_new, fpgrid_new, w_hat, change_flag
+        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat, change_flag
         
     sorted_indices = np.argsort(w_norms[peak_indices])[::-1]
     temp_indices = peak_indices[sorted_indices]
@@ -517,7 +514,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     temp_indices = temp_indices[w_norms[temp_indices] >= 0.05 * np.max(w_norms[temp_indices])]
     
     if len(temp_indices) == 0:
-        return A_new, A_inner_new, A_inner_no_phase_new, A_old_new, fpgrid_new, w_hat, change_flag
+        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat, change_flag
         
     for k_pitch in range(len(temp_indices)):
         biggest_f0_index = temp_indices[k_pitch]
@@ -550,10 +547,6 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
         # Update matrices
         temp_index_update = index_for_current_A + len(change_indices_curr_A)
 
-        A_inner_no_phase_new[change_indices_curr_A[0]:change_indices_curr_A[-1] + 1, 
-                            harmonic_indices[0]:harmonic_indices[-1] + 1] = \
-            A_inner_no_phase_temp[index_for_current_A:temp_index_update, :]
-            
         A_inner_new[change_indices_curr_A[0]:change_indices_curr_A[-1] + 1,
                    harmonic_indices[0]:harmonic_indices[-1] + 1] = \
             A_inner_temp[index_for_current_A:temp_index_update, :]
@@ -566,7 +559,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
             A_old_new[start_index_old_A:, harmonic_indices[0]:harmonic_indices[-1] + 1] = \
                 A_temp[:index_for_old_A + 1, :]
                 
-    return A_new, A_inner_new, A_inner_no_phase_new, A_old_new, fpgrid_new, w_hat, change_flag
+    return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat, change_flag
 
 
 def interval_search_anls(x: np.ndarray, L: int, f0_lim: np.ndarray, 
