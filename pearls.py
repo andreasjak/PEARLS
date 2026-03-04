@@ -394,8 +394,8 @@ def rls_update(w_old: np.ndarray, R: np.ndarray, r: np.ndarray,
 def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: float,
                      A: np.ndarray, A_inner: np.ndarray,
                      fpgrid: np.ndarray, t: np.ndarray, fs: float, Lmax: int, P: int,
-                     dictionary_length: int, start_index_time: int, stop_index_time: int,
-                     curr_index_curr_A: int, start_index_curr_A: int, stop_index_curr_A: int,
+                     start_index_time: int, stop_index_time: int,
+                     start_index_curr_A: int, stop_index_curr_A: int,
                      ) -> Tuple:
     """
     Update the pitch frequency grid adaptively.
