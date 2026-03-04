@@ -267,7 +267,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                     start_index_old_A = dictionary_length + start_index_curr_A
                     start_index_curr_A = 0
                     
-                    A, A_inner, A_old, fpgrid, w_hat, change_flag = \
+                    A, A_inner, A_old, fpgrid, w_hat = \
                         dictionary_update(
                             w_rls, ref_signal, pitch_limit, A, A_inner,
                             fpgrid, t, fs, Lmax, P, dictionary_length, start_index_time,
@@ -275,7 +275,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                             stop_index_curr_A, A_old, start_index_old_A
                         )
                 else:
-                    A, A_inner, _, fpgrid, w_hat, change_flag = \
+                    A, A_inner, _, fpgrid, w_hat = \
                         dictionary_update(
                             w_rls, ref_signal, pitch_limit, A, A_inner,
                             fpgrid, t, fs, Lmax, P, dictionary_length, start_index_time,
@@ -474,7 +474,6 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     -------
     Tuple of updated dictionary components and change flag
     """
-    change_flag = False
     w_reshape = w_hat.reshape(Lmax, P, order='F')
     w_norms = np.linalg.norm(w_reshape, axis=0)
     
@@ -505,7 +504,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     peak_indices, _ = find_peaks(w_norms)
     
     if len(peak_indices) == 0:
-        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat, change_flag
+        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
         
     sorted_indices = np.argsort(w_norms[peak_indices])[::-1]
     temp_indices = peak_indices[sorted_indices]
@@ -514,7 +513,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     temp_indices = temp_indices[w_norms[temp_indices] >= 0.05 * np.max(w_norms[temp_indices])]
     
     if len(temp_indices) == 0:
-        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat, change_flag
+        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
         
     for k_pitch in range(len(temp_indices)):
         biggest_f0_index = temp_indices[k_pitch]
@@ -532,7 +531,6 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
         if new_grid_point is None:
             continue
             
-        change_flag = True
         fpgrid_new[biggest_f0_index] = new_grid_point
         
         # Get harmonic indices
@@ -559,7 +557,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
             A_old_new[start_index_old_A:, harmonic_indices[0]:harmonic_indices[-1] + 1] = \
                 A_temp[:index_for_old_A + 1, :]
                 
-    return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat, change_flag
+    return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
 
 
 def interval_search_anls(x: np.ndarray, L: int, f0_lim: np.ndarray, 
