@@ -487,15 +487,10 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     
     if A_old is None:
         # Use only current dictionary
-        A_estimation = A[start_index_curr_A:curr_index_curr_A + 1, :]
         change_indices_curr_A = np.arange(start_index_curr_A, stop_index_curr_A + 1)
         index_for_current_A = 0
     else:
         # Need old dictionary due to overlap
-        A_estimation = np.vstack([
-            A_old[start_index_old_A:, :],
-            A[:(curr_index_curr_A + 1), :]
-        ])
         change_indices_curr_A = np.arange(start_index_curr_A, stop_index_curr_A + 1)
         index_for_current_A = nbr_time_points - len(change_indices_curr_A)
         index_for_old_A = index_for_current_A - 1
