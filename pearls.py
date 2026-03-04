@@ -91,8 +91,13 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # Dictionary initialization
     A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel(order='F')) / fs
-    A = np.exp(1j * A_inner)
-    A_old = A.copy()
+    # A will be used in a circular manner, where the first dictionary_length time steps
+    # are the current while the last dictionary_length time steps are the previous. 
+    # This allows for use of neative indexing if you need to access a time earlier than
+    # dictionary time 0.
+    A = np.zeros((2 * dictionary_length, P * Lmax), dtype=complex)
+    A[:dictionary_length, :] = np.exp(1j * A_inner)
+    A[dictionary_length:, :] = A[:dictionary_length, :]
     
     # Window for gamma update
     Delta = int(np.floor(np.log(0.01) / np.log(lambda_val)))
@@ -138,6 +143,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         # Update dictionary when cycle completes
         if (n+1) % dictionary_length == 0:
             A_old = A.copy()
+            A[dictionary_length:, :] = A[:dictionary_length, :]
             upper_time_index = min(N, n + dictionary_length)
 
             # If upper index wanted to exceed N we set the last part of t_temp to zero.
@@ -146,7 +152,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             t_temp[:upper_time_index - (n + 1)] = t[(n + 1):upper_time_index]
                 
             A_inner = 2 * np.pi * np.outer(t_temp, freq_mat.ravel(order='F')) / fs
-            A = np.exp(1j * A_inner)
+            A[:dictionary_length, :] = np.exp(1j * A_inner)
             
         dn = d[n]
         
@@ -159,22 +165,10 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             inner_prod_indices = np.arange(n - Delta + 1, n + 1)
             lambda_fact = lambda_val ** np.arange(Delta - 1, -1, -1)
             
-            if Delta > sample_index + 1:
-                delta_diff = Delta - (sample_index + 1)
-                d_for_inner_prod = d[inner_prod_indices]
-                
-                A_old_for_inner_prod = A_old[-(delta_diff):, :]
-                A_for_inner_prod = A[:(sample_index + 1), :]
-                
-                max_norm = np.max(np.abs(
-                    A_old_for_inner_prod.conj().T @ (d_for_inner_prod[:delta_diff] * lambda_fact[:delta_diff]) +
-                    A_for_inner_prod.conj().T @ (d_for_inner_prod[delta_diff:] * lambda_fact[delta_diff:])
-                ))
-            else:
-                A_inner_prod_indices = np.arange(sample_index - Delta + 1, sample_index + 1)
-                max_norm = np.max(np.abs(
-                    A[A_inner_prod_indices, :].conj().T @ (d[inner_prod_indices] * lambda_fact)
-                ))
+            A_inner_prod_indices = np.arange(sample_index - Delta + 1, sample_index + 1)
+            max_norm = np.max(np.abs(
+                A[A_inner_prod_indices, :].conj().T @ (d[inner_prod_indices] * lambda_fact)
+            ))
                 
             gamma = 0.1 * max_norm
             gamma2 = 1.0 * max_norm
@@ -258,30 +252,16 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                 stop_index_curr_A = curr_index_curr_A + update_horizon
                 
                 # Adjust if at end of dictionary cycle
-                index_diff = stop_index_curr_A - dictionary_length
-                if index_diff > 0:
-                    stop_index_curr_A = min(dictionary_length - 1, stop_index_curr_A)
+                stop_index_curr_A = min(dictionary_length - 1, stop_index_curr_A)
                     
-                if start_index_curr_A <= 0:
-                    # Need to use old A
-                    start_index_old_A = dictionary_length + start_index_curr_A
-                    start_index_curr_A = 0
-                    
-                    A, A_inner, A_old, fpgrid, w_hat = \
-                        dictionary_update(
-                            w_rls, ref_signal, pitch_limit, A, A_inner,
-                            fpgrid, t, fs, Lmax, P, dictionary_length, start_index_time,
-                            stop_index_time, curr_index_curr_A, start_index_curr_A,
-                            stop_index_curr_A, A_old, start_index_old_A
-                        )
-                else:
-                    A, A_inner, _, fpgrid, w_hat = \
-                        dictionary_update(
-                            w_rls, ref_signal, pitch_limit, A, A_inner,
-                            fpgrid, t, fs, Lmax, P, dictionary_length, start_index_time,
-                            stop_index_time, curr_index_curr_A, start_index_curr_A,
-                            stop_index_curr_A, None, None
-                        )
+  
+                A, A_inner, fpgrid, w_hat = \
+                    dictionary_update(
+                        w_rls, ref_signal, pitch_limit, A, A_inner,
+                        fpgrid, t, fs, Lmax, P, dictionary_length, start_index_time,
+                        stop_index_time, curr_index_curr_A, start_index_curr_A,
+                        stop_index_curr_A
+                    )
                         
     return w_rls_hist, fpgrid_hist
 
@@ -416,8 +396,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
                      fpgrid: np.ndarray, t: np.ndarray, fs: float, Lmax: int, P: int,
                      dictionary_length: int, start_index_time: int, stop_index_time: int,
                      curr_index_curr_A: int, start_index_curr_A: int, stop_index_curr_A: int,
-                     A_old: Optional[np.ndarray] = None, 
-                     start_index_old_A: Optional[int] = None) -> Tuple:
+                     ) -> Tuple:
     """
     Update the pitch frequency grid adaptively.
     
@@ -471,27 +450,20 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     
     A_new = A
     A_inner_new = A_inner
-    A_old_new = A_old
     fpgrid_new = fpgrid.copy()
     
     t_temp = t[start_index_time:stop_index_time + 1]
-    nbr_time_points = len(t_temp)
     
-    if A_old is None:
-        # Use only current dictionary
-        change_indices_curr_A = np.arange(start_index_curr_A, stop_index_curr_A + 1)
-        index_for_current_A = 0
-    else:
-        # Need old dictionary due to overlap
-        change_indices_curr_A = np.arange(start_index_curr_A, stop_index_curr_A + 1)
-        index_for_current_A = nbr_time_points - len(change_indices_curr_A)
-        index_for_old_A = index_for_current_A - 1
+    # Use only current dictionary
+    change_indices_curr_A = np.arange(start_index_curr_A, stop_index_curr_A + 1)
+    index_for_current_A = 0
+
         
     # Find biggest present pitches
     peak_indices, _ = find_peaks(w_norms)
     
     if len(peak_indices) == 0:
-        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
+        return A_new, A_inner_new, fpgrid_new, w_hat
         
     sorted_indices = np.argsort(w_norms[peak_indices])[::-1]
     temp_indices = peak_indices[sorted_indices]
@@ -500,7 +472,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     temp_indices = temp_indices[w_norms[temp_indices] >= 0.05 * np.max(w_norms[temp_indices])]
     
     if len(temp_indices) == 0:
-        return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
+        return A_new, A_inner_new, fpgrid_new, w_hat
         
     for biggest_f0_index in temp_indices:
         
@@ -537,11 +509,8 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
         A_new[np.ix_(change_indices_curr_A, harmonic_indices)] = \
             A_temp[index_for_current_A:temp_index_update, :]
             
-        if A_old is not None:
-            A_old_new[start_index_old_A:, harmonic_indices] = \
-                A_temp[:index_for_old_A + 1, :]
                 
-    return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
+    return A_new, A_inner_new, fpgrid_new, w_hat
 
 
 def interval_search_anls(x: np.ndarray, L: int, f0_lim: np.ndarray, 
