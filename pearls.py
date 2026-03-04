@@ -510,8 +510,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     if len(temp_indices) == 0:
         return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
         
-    for k_pitch in range(len(temp_indices)):
-        biggest_f0_index = temp_indices[k_pitch]
+    for biggest_f0_index in temp_indices:
         
         max_harm_amp = np.max(np.abs(w_reshape[:, biggest_f0_index]))
         nz_harmonics = np.where(np.abs(w_reshape[:, biggest_f0_index]) > 0.2 * max_harm_amp)[0]
@@ -540,16 +539,14 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
         # Update matrices
         temp_index_update = index_for_current_A + len(change_indices_curr_A)
 
-        A_inner_new[change_indices_curr_A[0]:change_indices_curr_A[-1] + 1,
-                   harmonic_indices[0]:harmonic_indices[-1] + 1] = \
+        A_inner_new[np.ix_(change_indices_curr_A, harmonic_indices)] = \
             A_inner_temp[index_for_current_A:temp_index_update, :]
             
-        A_new[change_indices_curr_A[0]:change_indices_curr_A[-1] + 1,
-             harmonic_indices[0]:harmonic_indices[-1] + 1] = \
+        A_new[np.ix_(change_indices_curr_A, harmonic_indices)] = \
             A_temp[index_for_current_A:temp_index_update, :]
             
         if A_old is not None:
-            A_old_new[start_index_old_A:, harmonic_indices[0]:harmonic_indices[-1] + 1] = \
+            A_old_new[start_index_old_A:, harmonic_indices] = \
                 A_temp[:index_for_old_A + 1, :]
                 
     return A_new, A_inner_new, A_old_new, fpgrid_new, w_hat
