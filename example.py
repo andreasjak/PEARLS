@@ -38,7 +38,8 @@ def main():
         
         # Two pitches with harmonics
         f1, f2 = 220, 330  # A3 and E4
-        x = (np.sin(2 * np.pi * f1 * t) + 0.5 * np.sin(2 * np.pi * 2 * f1 * t) +
+        # Added vibrato effect by modulating the frequency with a low-frequency sine wave
+        x = (np.sin(2 * np.pi * f1 * (2 * np.sin(4 * t)) * t) + 0.5 * np.sin(2 * np.pi * 2 * f1 * (2 * np.sin(4 * t))* t) +
              0.5 * np.sin(2 * np.pi * f2 * t) + 0.3 * np.sin(2 * np.pi * 2 * f2 * t))
         x += 0.01 * np.random.randn(len(x))  # Add noise
         
