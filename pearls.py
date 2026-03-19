@@ -8,6 +8,7 @@ DOI: 10.1109/TASLP.2016.2634118
 """
 
 import numpy as np
+import scipy as scp
 from typing import Tuple, Optional
 import warnings
 
@@ -385,7 +386,7 @@ def rls_update(w_old: np.ndarray, R: np.ndarray, r: np.ndarray,
         R_tilde = R_p + lambda_I
         r_tilde = r_p + rls_lambda * w_rls[temp_indices]
         
-        w_rls[temp_indices] = np.linalg.solve(R_tilde, r_tilde)
+        w_rls[temp_indices] = scp.linalg.solve(R_tilde, r_tilde)
         
     return w_rls
 
