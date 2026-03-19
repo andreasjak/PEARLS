@@ -130,7 +130,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     for n in range(N):
         if do_print and n % 100 == 0:
-            print(f'{n} of {N}')
+            print(f'\r{n} of {N} ', end='', flush=True)
             
         
         # Save current grid
@@ -142,7 +142,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         
         # Update dictionary when cycle completes
         if (n+1) % dictionary_length == 0:
-            A_old = A.copy()
             A[dictionary_length:, :] = A[:dictionary_length, :]
             upper_time_index = min(N, n + dictionary_length)
 
