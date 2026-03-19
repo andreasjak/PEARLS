@@ -237,23 +237,19 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             if np.max(w_norms) > 0.01:
                 current_index_time = n
                 update_horizon = 600
-                start_index_time = max(n - nbr_samples_for_pitch + 1, 1)
-                stop_index_time = current_index_time + update_horizon
-                
-                if stop_index_time >= N:
-                    update_horizon = update_horizon - (stop_index_time - N) - 1
-                    
-                stop_index_time = min(stop_index_time, N-1)
                 pitch_limit = fdist / 2
-                
+
+                # Moving forward either the desired update horizon, the remaining samples in the signal, or the remaining samples in the dictionary
+                forward_steps = min(update_horizon, N - 1 - current_index_time, dictionary_length - 1 - sample_index)
+                stop_index_time = current_index_time + forward_steps
+                stop_index_curr_A = sample_index + forward_steps
+
+                # Moving backward either the desired number of samples for pitch estimation, the current time index, or the existing samples in the dictionary (allowing for wrap-around)
+                backward_steps = min(nbr_samples_for_pitch, current_index_time, sample_index + dictionary_length - 1)
+                start_index_time = current_index_time - backward_steps
+                start_index_curr_A = sample_index - backward_steps
+
                 ref_signal = d[start_index_time:current_index_time + 1]
-                start_index_curr_A = sample_index - nbr_samples_for_pitch + 1
-                curr_index_curr_A = sample_index
-                stop_index_curr_A = curr_index_curr_A + update_horizon
-                
-                # Adjust if at end of dictionary cycle
-                stop_index_curr_A = min(dictionary_length - 1, stop_index_curr_A)
-                    
   
                 A, fpgrid, w_hat = \
                     dictionary_update(
