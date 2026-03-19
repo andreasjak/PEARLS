@@ -79,7 +79,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     # ========== INITIALIZATION ==========
     
     N = len(d)
-    fpgrid = np.arange(fmin, fmax + 1, fdist)
+    fpgrid = np.arange(fmin, fmax + 1, fdist, dtype=float)
     P = len(fpgrid)
     nbr_of_variables = P * Lmax
     
@@ -113,7 +113,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # History storage
     w_rls_hist = np.zeros((nbr_of_variables, N), dtype=complex)
-    fpgrid_hist = np.zeros((P, N))
+    fpgrid_hist = np.zeros((P, N), dtype=float)
     
     # Block update counters
     block_not_updated_since = np.zeros(P, dtype=int)
