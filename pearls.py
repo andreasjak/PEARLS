@@ -121,7 +121,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # Active/inactive blocks
     active_blocks = np.arange(P)
-    inactive_blocks = np.array([], dtype=int)
     
     # Active indices
     active_indices = np.arange(P * Lmax)
@@ -177,15 +176,14 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         if do_active_update:
             activation_candidates = np.where(block_not_updated_since > block_update_threshold)[0]
             
+            block_not_updated_since += 1
+
             if len(activation_candidates) > 0:
                 active_blocks = np.sort(np.union1d(active_blocks, activation_candidates))
-                inactive_blocks = np.setdiff1d(np.arange(P), active_blocks)
-                new_indices = index_matrix[:, activation_candidates].ravel(order='F')
-                active_indices = np.sort(np.union1d(active_indices, new_indices))
-                
+                active_indices = np.sort(index_matrix[:, active_blocks].ravel(order='F'))
+
                 block_not_updated_since[active_blocks] = 0
                 
-            block_not_updated_since[inactive_blocks] += 1
             
         # ========== PROXIMAL GRADIENT UPDATE ==========
         w_ell = w_hat[active_indices].copy()
@@ -222,10 +220,8 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                     set_to_zero = np.intersect1d(set_to_zero, zero_candidates)
                     
                     if len(set_to_zero) > 0:
-                        inactive_blocks = np.sort(np.union1d(set_to_zero, inactive_blocks))
-                        active_blocks = np.setdiff1d(np.arange(P), inactive_blocks)
-                        active_indices = index_matrix[:, active_blocks].ravel(order='F')
-                        active_indices = np.sort(active_indices)
+                        active_blocks = np.setdiff1d(active_blocks, set_to_zero)
+                        active_indices = np.sort(index_matrix[:, active_blocks].ravel(order='F'))
                         has_been_untouched_since[set_to_zero] = 0
                         
                 has_been_untouched_since += 1
