@@ -4,3 +4,5 @@ __pycache__/*
 thought.md
 BachData*
 stats
+stats_base
+stats.py
