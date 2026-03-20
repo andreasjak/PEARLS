@@ -49,7 +49,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # Dictionary learning settings
     do_dictionary_learning = True
-    do_active_update = True
     
     # Number of samples for dictionary update (e.g., 45 ms)
     nbr_samples_for_pitch = int(np.floor(45e-3 * fs))
@@ -58,7 +57,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     waiting_period = 9e-3  # The waiting period during which a pitch block can be excluded from updating (s).
     block_update_threshold = int(np.floor(fs * waiting_period)) # As above, expressed in nbr of samples.
     zero_update_threshold = int(np.floor(block_update_threshold / 10))
-    speed_up_horizon = block_update_threshold
     
     # Dictionary length stored in memory
     dictionary_length = 2000
@@ -110,14 +108,12 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     r = np.zeros(nbr_of_variables, dtype=complex)
     w_hat = np.zeros(nbr_of_variables, dtype=complex)
     w_rls = np.zeros(nbr_of_variables, dtype=complex)
+    w_norms = np.zeros(P, dtype=float)
     
     # History storage
     w_rls_hist = np.zeros((nbr_of_variables, N), dtype=complex)
     fpgrid_hist = np.zeros((P, N), dtype=float)
     
-    # Block update counters
-    block_not_updated_since = np.zeros(P, dtype=int)
-    has_been_untouched_since = np.zeros(P, dtype=int)
     
     # Active/inactive blocks
     active_blocks = np.arange(P)
@@ -172,19 +168,13 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             gamma = 0.1 * max_norm
             gamma2 = 1.0 * max_norm
             
-        # ========== ACTIVE SET UPDATE ==========
-        if do_active_update:
-            activation_candidates = np.where(block_not_updated_since > block_update_threshold)[0]
-            
-            block_not_updated_since += 1
 
-            if len(activation_candidates) > 0:
-                active_blocks = np.sort(np.union1d(active_blocks, activation_candidates))
-                active_indices = np.sort(index_matrix[:, active_blocks].ravel(order='F'))
-
-                block_not_updated_since[active_blocks] = 0
+        if n % block_update_threshold == 0:
+            active_blocks = np.arange(P)
                 
             
+        active_indices = np.sort(index_matrix[:, active_blocks].ravel(order='F'))
+
         # ========== PROXIMAL GRADIENT UPDATE ==========
         w_ell = w_hat[active_indices].copy()
         R_small = R[np.ix_(active_indices, active_indices)]
@@ -196,6 +186,9 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         )
         
         w_hat[active_indices] = w_ell
+
+        w_norms[active_blocks] = np.linalg.norm(w_ell.reshape(Lmax, -1, order='F'), axis=0)
+        active_blocks = np.where(w_norms > 0)[0]
         
         # ========== RLS FILTER UPDATE ==========
         if n > 100:
@@ -205,30 +198,9 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             
         w_rls_hist[:, n] = w_rls
         
-        # ========== SET INACTIVE BLOCKS TO ZERO ==========
-        if do_active_update:
-            has_been_untouched_since += 1
-            
-            if n > speed_up_horizon:
-                zero_candidates = np.where(has_been_untouched_since > zero_update_threshold)[0]
-                
-                if len(zero_candidates) > 0:
-                    w_norms = np.linalg.norm(
-                        w_hat.reshape(Lmax, P, order='F'), axis=0
-                    )
-                    set_to_zero = np.where(w_norms < 0.05)[0]
-                    set_to_zero = np.intersect1d(set_to_zero, zero_candidates)
-                    
-                    if len(set_to_zero) > 0:
-                        active_blocks = np.setdiff1d(active_blocks, set_to_zero)
-                        active_indices = np.sort(index_matrix[:, active_blocks].ravel(order='F'))
-                        has_been_untouched_since[set_to_zero] = 0
-                        
-                has_been_untouched_since += 1
                 
         # ========== DICTIONARY LEARNING ==========
         if do_dictionary_learning and n >= 1000 and ((n - 1) % 100) == 0:
-            w_norms = np.linalg.norm(w_hat.reshape(Lmax, P, order='F'), axis=0)
             
             if np.max(w_norms) > 0.01:
                 current_index_time = n
