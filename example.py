@@ -10,11 +10,13 @@ from pearls import pearls
 import cProfile
 
 def main():
+
+    profile = False
     """Run PEARLS on audio file."""
     
     # Read audio file
     # Note: Update path to your audio file
-    audio_file = 'audio.wav'
+    audio_file = 'BachData/Bach/01-AchGottundHerr.wav'
     
     try:
         fs, x = wavfile.read(audio_file)
@@ -51,92 +53,96 @@ def main():
     
     # Create analytic signal using Hilbert transform
     z = signal.hilbert(y)
+
+    z = z[:5_000]
     
     print(f"Processing signal: {len(z)} samples at {fs_new} Hz")
     print(f"Duration: {len(z) / fs_new:.2f} seconds")
-    
+
     # Run PEARLS algorithm
     print("\nRunning PEARLS algorithm...")
-    cProfile.runctx('pearls(d=z, lambda_val=0.995, rls_xi=10000, Lmax=10, fs=fs_new, fmin=80, fmax=400, fdist=5)',
-                    globals(), locals(), "stats")
-    # w_rls_hist, fpgrid_hist = pearls(
-    #     d=z,
-    #     lambda_val=0.995,
-    #     rls_xi=10000,
-    #     Lmax=10,
-    #     fs=fs_new,
-    #     fmin=80,
-    #     fmax=400,
-    #     fdist=5
-    # )
+    if profile:
+        cProfile.runctx('pearls(d=z, lambda_val=0.995, rls_xi=10000, Lmax=10, fs=fs_new, fmin=80, fmax=400, fdist=5)',
+                        globals(), locals(), "stats")
+        return
+
+    w_rls_hist, fpgrid_hist = pearls(
+        d=z,
+        lambda_val=0.995,
+        rls_xi=10000,
+        Lmax=10,
+        fs=fs_new,
+        fmin=40,
+        fmax=800,
+        fdist=10
+    )
     
-    # print("PEARLS algorithm completed!")
+    print("PEARLS algorithm completed!")
     
-    # # Visualization
-    # fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    # Visualization
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     
-    # # Plot 1: Filter coefficients
-    # im1 = axes[0].imshow(np.abs(w_rls_hist), aspect='auto', origin='lower', cmap='viridis')
-    # axes[0].set_title('Filter Coefficients (w_rls_hist)')
-    # axes[0].set_xlabel('Time (samples)')
-    # axes[0].set_ylabel('Coefficient Index')
-    # plt.colorbar(im1, ax=axes[0], label='Magnitude')
+    # Plot 1: Filter coefficients
+    im1 = axes[0].imshow(np.abs(w_rls_hist), aspect='auto', origin='lower', cmap='viridis')
+    axes[0].set_title('Filter Coefficients (w_rls_hist)')
+    axes[0].set_xlabel('Time (samples)')
+    axes[0].set_ylabel('Coefficient Index')
+    plt.colorbar(im1, ax=axes[0], label='Magnitude')
     
-    # # Plot 2: Pitch frequency grid
-    # time_axis = np.arange(fpgrid_hist.shape[1]) / fs_new
-    # pitch_axis = np.arange(fpgrid_hist.shape[0])
+    # Plot 2: Pitch frequency grid
+    time_axis = np.arange(fpgrid_hist.shape[1]) / fs_new
+    pitch_axis = np.arange(fpgrid_hist.shape[0])
     
-    # im2 = axes[1].imshow(fpgrid_hist, aspect='auto', origin='lower', 
-    #                      extent=[time_axis[0], time_axis[-1], 0, fpgrid_hist.shape[0]],
-    #                      cmap='viridis')
-    # axes[1].set_title('Pitch Frequency Grid (fpgrid_hist)')
-    # axes[1].set_xlabel('Time (s)')
-    # axes[1].set_ylabel('Pitch Index')
-    # plt.colorbar(im2, ax=axes[1], label='Frequency (Hz)')
+    im2 = axes[1].imshow(fpgrid_hist, aspect='auto', origin='lower', 
+                         extent=[time_axis[0], time_axis[-1], 0, fpgrid_hist.shape[0]],
+                         cmap='viridis')
+    axes[1].set_title('Pitch Frequency Grid (fpgrid_hist)')
+    axes[1].set_xlabel('Time (s)')
+    axes[1].set_ylabel('Pitch Index')
+    plt.colorbar(im2, ax=axes[1], label='Frequency (Hz)')
     
-    # plt.tight_layout()
-    # plt.show()
+    plt.tight_layout()
+    plt.show()
     
-    # # Create pitch trajectory plot
-    # fig2, ax = plt.subplots(figsize=(12, 6))
+    # Create pitch trajectory plot
+    fig2, ax = plt.subplots(figsize=(12, 6))
     
-    # # Compute pitch energies
-    # Lmax = 10
-    # P = fpgrid_hist.shape[0]
-    # w_reshape = w_rls_hist.reshape(Lmax, P, -1, order='F')
-    # pitch_energies = np.linalg.norm(w_reshape, axis=0)
+    # Compute pitch energies
+    Lmax = 10
+    P = fpgrid_hist.shape[0]
+    w_reshape = w_rls_hist.reshape(Lmax, P, -1, order='F')
+    pitch_energies = np.linalg.norm(w_reshape, axis=0)
     
-    # # Plot active pitches
-    # threshold = 0.1 * np.max(pitch_energies)
+    # Plot active pitches
+    threshold = 0.1 * np.max(pitch_energies)
     
-    # for p in range(P):
-    #     active = pitch_energies[p, :] > threshold
-    #     if np.any(active):
-    #         t_active = time_axis[active]
-    #         f_active = fpgrid_hist[p, active]
-    #         scatter = ax.scatter(t_active, f_active, c=pitch_energies[p, active], 
-    #                            s=20, alpha=0.6, cmap='plasma')
+    for p in range(P):
+        active = pitch_energies[p, :] > threshold
+        if np.any(active):
+            t_active = time_axis[active]
+            f_active = fpgrid_hist[p, active]
+            scatter = ax.scatter(t_active, f_active, c=pitch_energies[p, active], 
+                               s=20, alpha=0.6, cmap='plasma')
     
-    # ax.set_xlabel('Time (s)')
-    # ax.set_ylabel('Frequency (Hz)')
-    # ax.set_title('Active Pitch Trajectories')
-    # ax.grid(True, alpha=0.3)
-    # plt.colorbar(scatter, ax=ax, label='Pitch Energy')
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Frequency (Hz)')
+    ax.set_title('Active Pitch Trajectories')
+    ax.grid(True, alpha=0.3)
+    plt.colorbar(scatter, ax=ax, label='Pitch Energy')
     
-    # plt.tight_layout()
-    # plt.show()
+    plt.tight_layout()
+    plt.show()
     
-    # # # Save numerical results
-    # # np.savez('/mnt/user-data/outputs/pearls_output.npz',
-    # #          w_rls_hist=w_rls_hist,
-    # #          fpgrid_hist=fpgrid_hist,
-    # #          fs=fs_new,
-    # #          time=time_axis)
-    # # print("Numerical results saved to pearls_output.npz")
+    # # Save numerical results
+    # np.savez('/mnt/user-data/outputs/pearls_output.npz',
+    #          w_rls_hist=w_rls_hist,
+    #          fpgrid_hist=fpgrid_hist,
+    #          fs=fs_new,
+    #          time=time_axis)
+    # print("Numerical results saved to pearls_output.npz")
     
-    # return w_rls_hist, fpgrid_hist
+    return w_rls_hist, fpgrid_hist
 
 
 if __name__ == '__main__':
-    # cProfile.run('main()', "stats")
     main()
