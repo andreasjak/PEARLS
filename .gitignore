@@ -5,4 +5,6 @@ thought.md
 BachData*
 stats
 stats_base
+stats_improved
 stats.py
+*.png

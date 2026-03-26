@@ -11,14 +11,16 @@ import cProfile
 
 def main():
 
-    profile = False
+    profile = True
     """Run PEARLS on audio file."""
     
     # Read audio file
     # Note: Update path to your audio file
-    audio_file = 'BachData/Bach/02-AchLiebenChristen.wav'
+    audio_file = 'BachData/Bach/01-AchGottundHerr.wav'
     
     try:
+        if profile:
+            raise FileNotFoundError("Profiling mode - skipping audio file loading")
         fs, x = wavfile.read(audio_file)
         
         # Convert to float
@@ -54,7 +56,7 @@ def main():
     # Create analytic signal using Hilbert transform
     z = signal.hilbert(y)
 
-    z = z[:10_000]
+    # z = z[:10_000]
     
     print(f"Processing signal: {len(z)} samples at {fs_new} Hz")
     print(f"Duration: {len(z) / fs_new:.2f} seconds")
@@ -63,7 +65,7 @@ def main():
     print("\nRunning PEARLS algorithm...")
     if profile:
         cProfile.runctx('pearls(d=z, lambda_val=0.995, rls_xi=10000, Lmax=10, fs=fs_new, fmin=80, fmax=400, fdist=5)',
-                        globals(), locals(), "stats")
+                        globals(), locals(), "stats_improved")
         return
 
     w_rls_hist, fpgrid_hist, active_block_hist = pearls(
