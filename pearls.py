@@ -50,14 +50,16 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     # Dictionary learning settings
     do_dictionary_learning = True
     
+    chunk_size = 100
+    
     # Number of samples for dictionary update (e.g., 45 ms)
-    nbr_samples_for_pitch = int(np.floor(45e-3 * fs))
+    nbr_samples_for_pitch = max(int(np.floor(45e-3 * fs)), chunk_size)
     
     # Speed-up settings
     waiting_period = 9e-3  # The waiting period during which a pitch block can be excluded from updating (s).
     block_update_threshold = int(np.floor(fs * waiting_period)) # As above, expressed in nbr of samples.
     zero_update_threshold = int(np.floor(block_update_threshold / 10))
-    
+
     # Dictionary length stored in memory
     dictionary_length = 2000
     
@@ -67,7 +69,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # Proximal gradient settings
     step_size = 1e-4
-    max_iter = 20
+    max_iter = 200
     
     # Print progress
     do_print = True
@@ -154,11 +156,21 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         dn = d[n]
         
         # RLS update
-        R = lambda_val * R + np.outer(xn, xn.conj())
         r = lambda_val * r + xn * np.conj(dn)
-        
+
+        if n % chunk_size != 0:
+            continue
+
+        xs = A[sample_index - chunk_size + 1, :]
+        x1 = A[sample_index - chunk_size + 2, :] / xs
+        # Done this way to ensure use of correct fpgrid and phase, has otherwise
+        # caused of by one issus where A is not updated far enough into the future
+        xt = xs * x1 ** chunk_size
+
+        R = (lambda_val ** chunk_size) * R + (np.outer(xt, xt.conj()) - lambda_val ** (chunk_size) * np.outer(xs, xs.conj())) / (np.outer(x1, x1.conj()) - lambda_val)
+
         # ========== UPDATE PENALTY PARAMETERS ==========
-        if n >= Delta and (n % 401) == 0:
+        if n >= Delta:
             inner_prod_indices = np.arange(n - Delta + 1, n + 1)
             lambda_fact = lambda_val ** np.arange(Delta - 1, -1, -1)
             
@@ -171,10 +183,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             gamma2 = 1.0 * max_norm
             
 
-        if n % block_update_threshold == 0:
-            active_blocks = np.arange(P)
-                
-            
+        active_blocks = np.arange(P)
         active_indices = np.sort(index_matrix[:, active_blocks].ravel(order='F'))
 
         # ========== PROXIMAL GRADIENT UPDATE ==========
@@ -190,8 +199,8 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         w_hat[active_indices] = w_ell
 
         w_norms[active_blocks] = np.linalg.norm(w_ell.reshape(Lmax, -1, order='F'), axis=0)
-        if n % zero_update_threshold == 0 and n % block_update_threshold != 0:
-            active_blocks = np.where(w_norms > 0.05)[0]
+
+        active_blocks = np.where(w_norms > 0.05)[0]
         
         # ========== RLS FILTER UPDATE ==========
         if n > 100:
@@ -203,7 +212,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         
                 
         # ========== DICTIONARY LEARNING ==========
-        if do_dictionary_learning and n >= 1000 and ((n - 1) % 100) == 0:
+        if do_dictionary_learning and n >= 1000:
             
             if np.max(w_norms) > 0.01:
                 current_index_time = n
