@@ -16,7 +16,7 @@ def main():
     
     # Read audio file
     # Note: Update path to your audio file
-    audio_file = 'BachData/Bach/01-AchGottundHerr.wav'
+    audio_file = 'BachData/Bach/02-AchLiebenChristen.wav'
     
     try:
         fs, x = wavfile.read(audio_file)
@@ -54,7 +54,7 @@ def main():
     # Create analytic signal using Hilbert transform
     z = signal.hilbert(y)
 
-    z = z[:5_000]
+    z = z[:10_000]
     
     print(f"Processing signal: {len(z)} samples at {fs_new} Hz")
     print(f"Duration: {len(z) / fs_new:.2f} seconds")
@@ -66,7 +66,7 @@ def main():
                         globals(), locals(), "stats")
         return
 
-    w_rls_hist, fpgrid_hist = pearls(
+    w_rls_hist, fpgrid_hist, active_block_hist = pearls(
         d=z,
         lambda_val=0.995,
         rls_xi=10000,
@@ -131,6 +131,9 @@ def main():
     plt.colorbar(scatter, ax=ax, label='Pitch Energy')
     
     plt.tight_layout()
+    plt.show()
+
+    plt.imshow(active_block_hist, aspect='auto', origin='lower', cmap='gray_r')
     plt.show()
     
     # # Save numerical results
