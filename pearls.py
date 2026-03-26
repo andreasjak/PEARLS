@@ -117,6 +117,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
     
     # Active/inactive blocks
     active_blocks = np.arange(P)
+    active_blocks_hist = np.zeros((P, N))
     
     # Active indices
     active_indices = np.arange(P * Lmax)
@@ -131,6 +132,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         
         # Save current grid
         fpgrid_hist[:, n] = fpgrid
+        active_blocks_hist[active_blocks, n] = 1
         
         # ========== NEW SAMPLE ==========
         sample_index = n % dictionary_length 
@@ -188,7 +190,8 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         w_hat[active_indices] = w_ell
 
         w_norms[active_blocks] = np.linalg.norm(w_ell.reshape(Lmax, -1, order='F'), axis=0)
-        active_blocks = np.where(w_norms > 0)[0]
+        if n % zero_update_threshold == 0 and n % block_update_threshold != 0:
+            active_blocks = np.where(w_norms > 0.05)[0]
         
         # ========== RLS FILTER UPDATE ==========
         if n > 100:
@@ -227,7 +230,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
                         stop_index_curr_A
                     )
                         
-    return w_rls_hist, fpgrid_hist
+    return w_rls_hist, fpgrid_hist, active_blocks_hist
 
 
 def proximal_gradient_update(w_in: np.ndarray, Rn: np.ndarray, rn: np.ndarray,
