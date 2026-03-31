@@ -135,6 +135,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         # Save current grid
         fpgrid_hist[:, n] = fpgrid
         active_blocks_hist[active_blocks, n] = 1
+        w_rls_hist[:, n-1] = w_rls
         
         # ========== NEW SAMPLE ==========
         sample_index = n % dictionary_length 
@@ -201,6 +202,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
         w_norms[active_blocks] = np.linalg.norm(w_ell.reshape(Lmax, -1, order='F'), axis=0)
 
         active_blocks = np.where(w_norms > 0.05)[0]
+        active_indices = np.sort(index_matrix[:, active_blocks].ravel(order='F'))
         
         # ========== RLS FILTER UPDATE ==========
         if n > 100:
@@ -208,7 +210,6 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
             w_rls = np.zeros(nbr_of_variables, dtype=complex)
             w_rls[active_indices] = w_rls_new
             
-        w_rls_hist[:, n] = w_rls
         
                 
         # ========== DICTIONARY LEARNING ==========
@@ -275,13 +276,17 @@ def proximal_gradient_update(w_in: np.ndarray, Rn: np.ndarray, rn: np.ndarray,
         Updated filter coefficients
     """
     w_ell = w_in.copy()
-    first_harm_amps = np.ones(P)
+    first_harm_amps = w_ell[::Lmax].copy()
+
+    if P == 0:
+        return w_ell
     
     for ell in range(max_iter):
         # Gradient step
         temp_gradient = -rn + Rn @ w_ell
         r_ell = w_ell - step_size * temp_gradient
         r_ell = soft_threshold(r_ell, gamma * step_size)
+        w_ell_old = w_ell.copy()
         
         # Projection for each block
         for k_block in range(P):
@@ -293,6 +298,9 @@ def proximal_gradient_update(w_in: np.ndarray, Rn: np.ndarray, rn: np.ndarray,
             temp = max(temp_norm - gamma2_temp * step_size**2, 0)
             
             w_ell[temp_indices] = temp / (temp + gamma2_temp * step_size**2) * temp_w
+
+        if np.max(np.abs(w_ell - w_ell_old)) < 1e-6:
+            break
             
         first_harm_amps = w_ell[::Lmax]
         

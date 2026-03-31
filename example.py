@@ -11,7 +11,7 @@ import cProfile
 
 def main():
 
-    profile = True
+    profile = False
     """Run PEARLS on audio file."""
     
     # Read audio file
@@ -65,7 +65,7 @@ def main():
     print("\nRunning PEARLS algorithm...")
     if profile:
         cProfile.runctx('pearls(d=z, lambda_val=0.995, rls_xi=10000, Lmax=10, fs=fs_new, fmin=80, fmax=400, fdist=5)',
-                        globals(), locals(), "stats_improved")
+                        globals(), locals(), "stats_improved_2")
         return
 
     w_rls_hist, fpgrid_hist, active_block_hist = pearls(

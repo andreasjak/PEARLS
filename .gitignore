@@ -3,8 +3,6 @@ pearls_copy.py
 __pycache__/*
 thought.md
 BachData*
-stats
-stats_base
-stats_improved
-stats.py
+stats*
 *.png
+*.wav
