@@ -232,7 +232,7 @@ def pearls(d: np.ndarray, lambda_val: float, rls_xi: float, Lmax: int,
 
                 ref_signal = d[start_index_time:current_index_time + 1]
   
-                A, fpgrid, w_hat = \
+                A, fpgrid = \
                     dictionary_update(
                         w_rls, ref_signal, pitch_limit, A,
                         fpgrid, t, fs, Lmax, P, start_index_time,
@@ -446,7 +446,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     peak_indices, _ = find_peaks(w_norms)
     
     if len(peak_indices) == 0:
-        return A_new, fpgrid_new, w_hat
+        return A_new, fpgrid_new
         
     sorted_indices = np.argsort(w_norms[peak_indices])[::-1]
     temp_indices = peak_indices[sorted_indices]
@@ -455,7 +455,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
     temp_indices = temp_indices[w_norms[temp_indices] >= 0.05 * np.max(w_norms[temp_indices])]
     
     if len(temp_indices) == 0:
-        return A_new, fpgrid_new, w_hat
+        return A_new, fpgrid_new
         
     for biggest_f0_index in temp_indices:
         
@@ -490,7 +490,7 @@ def dictionary_update(w_hat: np.ndarray, ref_signal: np.ndarray, pitch_limit: fl
             A_temp[index_for_current_A:temp_index_update, :]
             
                 
-    return A_new, fpgrid_new, w_hat
+    return A_new, fpgrid_new
 
 
 def interval_search_anls(x: np.ndarray, L: int, f0_lim: np.ndarray, 
